@@ -2,7 +2,7 @@ import cv2
 from human_detection import HumanDetector
 
 # Paths to model files
-model_path = "mobilenetv2.caffemodel"
+model_path = "mobilenet_iter_73000.caffemodel"
 config_path = "deploy.prototxt"
 
 # Initialize HumanDetector
