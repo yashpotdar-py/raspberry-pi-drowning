@@ -4,6 +4,36 @@ import threading
 import queue
 import time
 
+def draw_detections(frame, detections, w, h, scale_x, scale_y):
+    """Draw detection boxes on frame"""
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        if confidence > 0.5:  # Lower threshold for better performance
+            class_id = int(detections[0, 0, i, 1])
+            if class_id == 15:  # Person class
+                box = detections[0, 0, i, 3:7] * np.array([320, 240, 320, 240])
+                (startX, startY, endX, endY) = box.astype("int")
+                
+                # Scale back to original frame size
+                startX = int(startX * scale_x)
+                startY = int(startY * scale_y)
+                endX = int(endX * scale_x)
+                endY = int(endY * scale_y)
+                
+                # Ensure coordinates are within frame bounds
+                startX = max(0, min(startX, w-1))
+                startY = max(0, min(startY, h-1))
+                endX = max(0, min(endX, w-1))
+                endY = max(0, min(endY, h-1))
+                
+                # Draw rectangle and label
+                cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
+                label = f"Person: {confidence:.2f}"
+                cv2.putText(frame, label, (startX, startY - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+    
+    return frame
+
 # Load MobileNet SSD model
 net = cv2.dnn.readNetFromCaffe("MobileNetSSD_deploy.prototxt",
                                "MobileNetSSD_deploy.caffemodel")
@@ -135,36 +165,6 @@ while True:
     # cv2.imshow("Video - Press 'q' to Quit", display_frame)
     # if cv2.waitKey(1) & 0xFF == ord('q'):
     #     break
-
-def draw_detections(frame, detections, w, h, scale_x, scale_y):
-    """Draw detection boxes on frame"""
-    for i in range(detections.shape[2]):
-        confidence = detections[0, 0, i, 2]
-        if confidence > 0.5:  # Lower threshold for better performance
-            class_id = int(detections[0, 0, i, 1])
-            if class_id == 15:  # Person class
-                box = detections[0, 0, i, 3:7] * np.array([process_width, process_height, process_width, process_height])
-                (startX, startY, endX, endY) = box.astype("int")
-                
-                # Scale back to original frame size
-                startX = int(startX * scale_x)
-                startY = int(startY * scale_y)
-                endX = int(endX * scale_x)
-                endY = int(endY * scale_y)
-                
-                # Ensure coordinates are within frame bounds
-                startX = max(0, min(startX, w-1))
-                startY = max(0, min(startY, h-1))
-                endX = max(0, min(endX, w-1))
-                endY = max(0, min(endY, h-1))
-                
-                # Draw rectangle and label
-                cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-                label = f"Person: {confidence:.2f}"
-                cv2.putText(frame, label, (startX, startY - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-    
-    return frame
 
 # Cleanup
 frame_queue.put(None)  # Signal worker to stop
