@@ -21,6 +21,10 @@ while True:
 
     frame_count += 1
 
+    # Lightweight progress indicator every 10 frames
+    if frame_count % 10 == 0:
+        print(f"Processing frame {frame_count}...", end='\r')
+
     # Convert to 3-channel BGR if needed
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
@@ -33,6 +37,7 @@ while True:
     net.setInput(blob)
     detections = net.forward()
 
+    # Check each detection
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
         if confidence > 0.6:
@@ -41,3 +46,4 @@ while True:
                 print(f"[Frame {frame_count}] Person detected with confidence: {confidence:.2f}")
 
 cap.release()
+print("\n[INFO] Video processing complete.")
