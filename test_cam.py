@@ -1,26 +1,23 @@
 import cv2
+from picamera2 import Picamera2
+import time
 
-# Optionally specify backend for Raspberry Pi explicitly
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+# Initialize Picamera2
+picam2 = Picamera2()
+picam2.start()
 
-if not cap.isOpened():
-    print("Error: Cannot open camera")
-    exit()
-
-# Optional: set resolution
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+# Give camera time to warm up
+time.sleep(0.1)
 
 print("Press 'q' to quit.")
 while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("Failed to grab frame")
-        break
+    img = picam2.capture_array()
+    if img is None:
+        print("Warning: no frame captured")
+        continue
 
-    cv2.imshow("CSI Camera Test", frame)
+    cv2.imshow("Camera Test", img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-cap.release()
 cv2.destroyAllWindows()
