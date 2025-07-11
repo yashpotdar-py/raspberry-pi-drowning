@@ -1,122 +1,64 @@
 import cv2
 import numpy as np
+from picamera2 import Picamera2, Preview
 
 class HumanDetector:
     def __init__(self, model_path, config_path, confidence_threshold=0.5):
-        """
-        Initialize the human detector with a pre-trained MobileNet SSD model.
-
-        :param model_path: Path to the model weights (e.g., .caffemodel).
-        :param config_path: Path to the model configuration file (e.g., .prototxt).
-        :param confidence_threshold: Minimum confidence threshold for detecting humans.
-        """
-        self.net = cv2.dnn.readNetFromCaffe(config_path, model_path)  # Load the model
-        self.input_size = (300, 300)  # Input size for the model
-        self.confidence_threshold = confidence_threshold  # Confidence threshold
+        self.net = cv2.dnn.readNetFromCaffe(config_path, model_path)
+        self.confidence_threshold = confidence_threshold
+        self.input_size = (300, 300)
 
     def detect_humans(self, frame):
-        """
-        Detect humans in the given frame.
-
-        :param frame: Input image from the camera.
-        :return: List of tuples [(startX, startY, endX, endY, position)] for detected humans.
-        """
-        # Prepare the frame for the model
-        blob = cv2.dnn.blobFromImage(frame, 1.0, self.input_size, (127.5, 127.5, 127.5), swapRB=True, crop=False)
+        blob = cv2.dnn.blobFromImage(frame, 1.0, self.input_size,
+                                     (127.5, 127.5, 127.5), swapRB=True, crop=False)
         self.net.setInput(blob)
         detections = self.net.forward()
 
         humans = []
-        h, w = frame.shape[:2]  # Frame dimensions
+        h, w = frame.shape[:2]
         for i in range(detections.shape[2]):
-            confidence = float(detections[0, 0, i, 2])
-            if confidence > self.confidence_threshold:
-                # Get bounding box coordinates
+            conf = float(detections[0, 0, i, 2])
+            if conf > self.confidence_threshold:
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-                (startX, startY, endX, endY) = box.astype("int")
-
-                # Calculate the center of the bounding box
-                centerX = (startX + endX) // 2
-                centerY = (startY + endY) // 2
-
-                # Determine the position on the screen
-                position = self.get_position(centerX, centerY, w, h)
-
-                # Append the bounding box and position
-                humans.append((startX, startY, endX, endY, position))
-
+                sx, sy, ex, ey = box.astype(int)
+                cx, cy = (sx + ex) // 2, (sy + ey) // 2
+                pos = self.get_position(cx, cy, w, h)
+                humans.append((sx, sy, ex, ey, pos))
         return humans
 
-    def get_position(self, centerX, centerY, frame_width, frame_height):
-        """
-        Determine the relative position of the detected human on the screen.
-
-        :param centerX: X-coordinate of the bounding box center.
-        :param centerY: Y-coordinate of the bounding box center.
-        :param frame_width: Width of the frame.
-        :param frame_height: Height of the frame.
-        :return: A string describing the position (e.g., 'top-left', 'center', etc.).
-        """
-        # Define thresholds for dividing the frame into regions
-        width_third = frame_width // 3
-        height_third = frame_height // 3
-
-        if centerY < height_third:
-            vertical = "top"
-        elif centerY > 2 * height_third:
-            vertical = "bottom"
-        else:
-            vertical = "middle"
-
-        if centerX < width_third:
-            horizontal = "left"
-        elif centerX > 2 * width_third:
-            horizontal = "right"
-        else:
-            horizontal = "center"
-
-        return f"{vertical}-{horizontal}"
-
+    def get_position(self, cx, cy, fw, fh):
+        w3, h3 = fw // 3, fh // 3
+        vert = 'top' if cy < h3 else 'bottom' if cy > 2*h3 else 'middle'
+        horz = 'left' if cx < w3 else 'right' if cx > 2*w3 else 'center'
+        return f"{vert}-{horz}"
 
 def main():
-    # Paths to model files
     model_path = "mobilenetv2.caffemodel"
     config_path = "deploy.prototxt"
-
-    # Initialize HumanDetector
     detector = HumanDetector(model_path, config_path)
 
-    # Initialize the camera
-    cap = cv2.VideoCapture(0)  # Use the default camera
-    if not cap.isOpened():
-        print("Error: Could not open the camera.")
-        return
+    picam2 = Picamera2()
+    config = picam2.create_preview_configuration(main={"format": "XRGB8888", "size": (640, 480)})
+    picam2.configure(config)
+    picam2.start()  # warm-up happens internally by Picamera2 :contentReference[oaicite:1]{index=1}
 
-    print("Starting human detection. Press Ctrl+C to stop.")
-
+    print("Starting... press Ctrl+C to exit")
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("Error: Could not read the frame.")
-                break
-
-            # Detect humans and their positions
+            frame = picam2.capture_array()
             humans = detector.detect_humans(frame)
-
-            if humans:
-                for (startX, startY, endX, endY, position) in humans:
-                    print(f"Human detected at position: {position}, Bounding box: ({startX}, {startY}, {endX}, {endY})")
-            else:
-                print("No humans detected.")
-
+            for sx, sy, ex, ey, pos in humans:
+                cv2.rectangle(frame, (sx, sy), (ex, ey), (0, 255, 0), 2)
+                cv2.putText(frame, pos, (sx, sy - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            cv2.imshow("Humans", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
     except KeyboardInterrupt:
-        print("\nStopping detection...")
-
+        pass
     finally:
-        # Release resources
-        cap.release()
-        print("Camera released.")
+        picam2.close()
+        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
