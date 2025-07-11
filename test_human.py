@@ -16,10 +16,16 @@ time.sleep(0.1)  # Warm-up time
 print("Press 'q' to quit.")
 while True:
     frame = picam2.capture_array()
-
+    if len(frame.shape) == 2 or frame.shape[2] == 1:
+        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    
     # Preprocess image for MobileNet SSD
     blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
                                  0.007843, (300, 300), 127.5)
+
+    # Preprocess image for MobileNet SSD
+    # blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
+    #                              0.007843, (300, 300), 127.5)
     net.setInput(blob)
     detections = net.forward()
 
