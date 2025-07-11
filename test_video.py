@@ -13,6 +13,16 @@ if not cap.isOpened():
     print(f"[ERROR] Could not open video: {video_path}")
     exit()
 
+# Get video properties
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = cap.get(cv2.CAP_PROP_FPS)
+output_path = "output_detected.mp4"
+
+# Define codec and create VideoWriter
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
 frame_count = 0
 
 while True:
@@ -48,7 +58,7 @@ while True:
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (startX, startY, endX, endY) = box.astype("int")
 
-                # Draw rectangle and confidence label
+                # Draw rectangle and label
                 cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
                 label = f"Person: {confidence:.2f}"
                 cv2.putText(frame, label, (startX, startY - 10),
@@ -56,7 +66,10 @@ while True:
 
                 print(f"[Frame {frame_count}] Person detected with confidence: {confidence:.2f}")
 
-    # Show frame in a window (resized to reduce load if needed)
+    # Write the annotated frame to output video
+    out.write(frame)
+
+    # Optionally show resized frame to reduce display load
     display_frame = cv2.resize(frame, (640, 360))
     cv2.imshow("Video - Press 'q' to Quit", display_frame)
 
@@ -65,5 +78,6 @@ while True:
         break
 
 cap.release()
+out.release()
 cv2.destroyAllWindows()
-print("\n[INFO] Video processing complete.")
+print(f"\n[INFO] Video processing complete. Results saved to '{output_path}'.")
